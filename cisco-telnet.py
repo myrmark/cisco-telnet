@@ -279,58 +279,68 @@ def main(host,mac,now):
         #     password = b"a4tg#gj97gm"
         # elif tn.expect(promptlist, timeout=.1)[0] == 2:
         #     password = b"p1lu77aD!G"
+        try:
+            dbpw = keyring.get_password("172.28.88.47", "simdbuploader")
+            mydb = mysql.connector.connect(
+            host="172.28.88.47",
+            user="simdbuploader",
+            password=dbpw,
+            database="simdb"
+            )
+            mycursor = mydb.cursor()
+            sql = "INSERT INTO simdb.cisco (customerid,projectid,sapnumber,serial,firmware,config,mac,manufacturingorder) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
+            val = (customerid,projectid,sap,serial,dbfirmware,dbconfig,mac,mo)
+            mycursor.execute(sql, val)
+            mydb.commit()
+        except Exception:
+            print("Unexpected error during database upload")
+            print(Exception)
 
-        dbpw = keyring.get_password("172.28.88.47", "simdbuploader")
-        mydb = mysql.connector.connect(
-        host="172.28.88.47",
-        user="simdbuploader",
-        password=dbpw,
-        database="simdb"
-        )
-        mycursor = mydb.cursor()
-        sql = "INSERT INTO simdb.cisco (customerid,projectid,sapnumber,serial,firmware,config,mac,manufacturingorder) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
-        val = (customerid,projectid,sap,serial,dbfirmware,dbconfig,mac,mo)
-        mycursor.execute(sql, val)
-        mydb.commit()
-
-        db = pymysql.connect(host="172.28.88.47",user="simdbuploader",password=dbpw,database="simdb")
-        cursor = db.cursor()
-        cursor.execute("SELECT unitid FROM simdb.cisco WHERE serial='{}'".format(serial))
-        unitid = cursor.fetchall()
-        for row in unitid:
-            unitid = row[0]
-        unitid = str(unitid)
-        unitid = unitid.strip()
-        db.close()
-
-        if unitid == "None":
-            print(f"{bcolors.WARNING}{serial} Unable to verify that the information was uploaded to the database{bcolors.ENDC}")
-            print(f"{bcolors.FAIL}{serial} Database upload verification FAIL{bcolors.ENDC}")
-        elif unitid != "None":
+        try:
             db = pymysql.connect(host="172.28.88.47",user="simdbuploader",password=dbpw,database="simdb")
             cursor = db.cursor()
-            cursor.execute("SELECT moremaining FROM simdb.manufacturingorder WHERE monumber='%s'" % (mo))
-            vf = cursor.fetchall()
-            for row in vf:
-                vf = row[0]
-            vf = str(vf)
-            vf = vf.strip("("")"",""'")
-            vf = int(vf)
-            vf -= 1
+            cursor.execute("SELECT unitid FROM simdb.cisco WHERE serial='{}'".format(serial))
+            unitid = cursor.fetchall()
+            for row in unitid:
+                unitid = row[0]
+            unitid = str(unitid)
+            unitid = unitid.strip()
             db.close()
-            db = pymysql.connect(host="172.28.88.47",user="simdbuploader",password=dbpw,database="simdb")
-            cursor = db.cursor()
-            cursor.execute("UPDATE simdb.manufacturingorder SET moremaining ='{}' WHERE monumber ='{}'".format(vf,mo))
-            db.commit()
-            db.close()
-            print(f"{bcolors.OKGREEN}{serial} Database upload verification PASS{bcolors.ENDC}")
-            end = time.time()
-            endtime = (end - start)
-            #print(serial, " ", "Total time: ",endtime)
-            myfile = open('{}.txt'.format(now), 'a')
-            myfile.write(mac)
-            myfile.close()
-            print("\a")
+        except Exception:
+            print("Unexpected error during unitid fetch")
+            print(Exception)
+        try:
+            if unitid == "None":
+                print(f"{bcolors.WARNING}{serial} Unable to verify that the information was uploaded to the database{bcolors.ENDC}")
+                print(f"{bcolors.FAIL}{serial} Database upload verification FAIL{bcolors.ENDC}")
+            elif unitid != "None":
+                db = pymysql.connect(host="172.28.88.47",user="simdbuploader",password=dbpw,database="simdb")
+                cursor = db.cursor()
+                cursor.execute("SELECT moremaining FROM simdb.manufacturingorder WHERE monumber='%s'" % (mo))
+                vf = cursor.fetchall()
+                for row in vf:
+                    vf = row[0]
+                vf = str(vf)
+                vf = vf.strip("("")"",""'")
+                vf = int(vf)
+                vf -= 1
+                db.close()
+                db = pymysql.connect(host="172.28.88.47",user="simdbuploader",password=dbpw,database="simdb")
+                cursor = db.cursor()
+                cursor.execute("UPDATE simdb.manufacturingorder SET moremaining ='{}' WHERE monumber ='{}'".format(vf,mo))
+                db.commit()
+                db.close()
+                print(f"{bcolors.OKGREEN}{serial} Database upload verification PASS{bcolors.ENDC}")
+                end = time.time()
+                endtime = (end - start)
+                #print(serial, " ", "Total time: ",endtime)
+                myfile = open('{}.txt'.format(now), 'a')
+                myfile.write(mac)
+                myfile.close()
+                print("\a")
+        except Exception:
+            print(Exception)
+            
     except Exception:
         del active_ips[mac]
         sys.exit()
